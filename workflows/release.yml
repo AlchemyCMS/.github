@@ -1,0 +1,59 @@
+name: Publish Release (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      version_file_path:
+        description: 'Path to the version file (e.g., lib/alchemy/solidus/version.rb)'
+        required: true
+        type: string
+    secrets:
+      app_id:
+        description: 'GitHub App ID for authentication'
+        required: true
+      app_private_key:
+        description: 'GitHub App private key for authentication'
+        required: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+
+    steps:
+      - name: Generate token
+        id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.app_id }}
+          private-key: ${{ secrets.app_private_key }}
+
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ steps.generate-token.outputs.token }}
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+          ruby-version: ruby
+
+      - name: Release gem to RubyGems
+        uses: rubygems/release-gem@v1
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(grep VERSION ${{ inputs.version_file_path }} | sed 's/.*"\(.*\)".*/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
