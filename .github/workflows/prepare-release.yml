@@ -169,4 +169,11 @@ jobs:
             Once merged, the gem will be automatically published to RubyGems.`
             });
 
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              labels: ['skip-changelog']
+            });
+
             console.log(`Created PR #${pr.number}: ${pr.html_url}`);
