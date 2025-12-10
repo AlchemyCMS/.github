@@ -165,7 +165,7 @@ These are standard across all AlchemyCMS gems.
 - Creates release branch `release/vX.Y.Z`
 - Generates changelog from GitHub release notes API
 - Updates version file and prepends to CHANGELOG.md
-- Creates PR targeting the branch it was triggered from (`main` or `*-stable`)
+- Creates PR (with `skip-changelog` label) targeting the branch it was triggered from (`main` or `*-stable`)
 
 **release.yml**
 - Triggers when a `release/v*` PR is merged to `main` or `*-stable` branches
@@ -175,11 +175,13 @@ These are standard across all AlchemyCMS gems.
 
 **post-release.yml**
 - Triggers after successful release
-- **Version bump:**
+- **Version bump:** Creates a PR (with `skip-changelog` label) to bump version:
   - On `main`: bumps to next minor dev version (e.g., `1.2.0` → `1.3.0.dev`)
   - On `*-stable`: bumps to next patch dev version (e.g., `8.0.0` → `8.0.1.dev`)
-- **Changelog sync:** For stable branch releases, copies the changelog entry to `main` branch
+- **Changelog sync:** For stable branch releases, creates a PR to copy the changelog entry to `main` branch
 - **Announcements:** Posts release notifications to Slack, Mastodon, and Bluesky (if secrets are configured)
+
+All PRs created by these workflows are labeled with `skip-changelog` to exclude them from future release notes.
 
 ## Release Announcements
 
