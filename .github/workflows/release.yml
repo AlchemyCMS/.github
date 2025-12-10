@@ -54,7 +54,7 @@ jobs:
       - name: Get version
         id: version
         run: |
-          VERSION=$(grep VERSION ${{ inputs.version_file_path }} | sed 's/.*"\(.*\)".*/\1/')
+          VERSION=$(grep 'VERSION = "' ${{ inputs.version_file_path }} | sed 's/.*"\(.*\)".*/\1/')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Version: $VERSION"
 
