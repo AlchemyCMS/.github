@@ -7,6 +7,11 @@ on:
         description: 'Path to the version file (e.g., lib/alchemy/solidus/version.rb)'
         required: true
         type: string
+      target_branch:
+        description: 'Branch to update (defaults to main)'
+        required: false
+        type: string
+        default: 'main'
       gem_name:
         description: 'Name of the gem for announcements (defaults to repo name)'
         required: false
@@ -49,7 +54,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ steps.generate-token.outputs.token }}
-          ref: main
+          ref: ${{ inputs.target_branch }}
 
       - name: Calculate next dev version
         id: version
@@ -58,12 +63,26 @@ jobs:
           CURRENT=$(grep VERSION "${{ inputs.version_file_path }}" | sed 's/.*"\(.*\)".*/\1/')
           echo "Current version: $CURRENT"
 
-          # Split into major.minor.patch
-          IFS='.' read -r MAJOR MINOR _ <<< "$CURRENT"
+          # Strip any pre-release suffix to get base version
+          BASE_VERSION=$(echo "$CURRENT" | sed 's/\.[a-zA-Z][a-zA-Z0-9]*$//')
+          echo "Base version: $BASE_VERSION"
 
-          # Bump minor version and add .dev suffix
-          MINOR=$((MINOR + 1))
-          NEW_VERSION="$MAJOR.$MINOR.0.dev"
+          # Split into major.minor.patch
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
+
+          # Determine bump type based on branch
+          # Stable branches (x.y-stable) bump PATCH, main bumps MINOR
+          BRANCH="${{ inputs.target_branch }}"
+          if [[ "$BRANCH" == *-stable ]]; then
+            echo "Stable branch detected, bumping PATCH"
+            PATCH=$((PATCH + 1))
+            NEW_VERSION="$MAJOR.$MINOR.$PATCH.dev"
+          else
+            echo "Main branch detected, bumping MINOR"
+            MINOR=$((MINOR + 1))
+            NEW_VERSION="$MAJOR.$MINOR.0.dev"
+          fi
+
           echo "New dev version: $NEW_VERSION"
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
 
@@ -80,7 +99,7 @@ jobs:
         run: |
           git add ${{ inputs.version_file_path }}
           git commit -m "Start development of version ${{ steps.version.outputs.version }}"
-          git push origin main
+          git push origin ${{ inputs.target_branch }}
 
   announce:
     runs-on: ubuntu-latest

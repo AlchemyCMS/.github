@@ -153,12 +153,13 @@ jobs:
             const { readFileSync } = require('fs');
             const releaseNotes = readFileSync('/tmp/pr-body.md', 'utf8');
 
+            const baseBranch = context.ref.replace('refs/heads/', '');
             const { data: pr } = await github.rest.pulls.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: 'Release v${{ steps.version.outputs.version }}',
               head: 'release/v${{ steps.version.outputs.version }}',
-              base: 'main',
+              base: baseBranch,
               body: `## Release v${{ steps.version.outputs.version }}
 
             ${releaseNotes}
