@@ -33,6 +33,7 @@ changelog:
     - title: "Documentation"
       labels:
         - documentation
+        - Documentation
         - docs
 
     - title: "Deprecations"
