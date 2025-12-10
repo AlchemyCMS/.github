@@ -142,9 +142,9 @@ For repositories with `x.y-stable` branches (e.g., `8.0-stable`):
 
 This creates a PR targeting the stable branch. After merge:
 1. **Publish Release** - Publishes gem and creates GitHub release
-2. **Post Release** - Bumps to next patch dev version (e.g., `8.0.0` → `8.0.1.dev`), syncs changelog to `main`, and announces the release
+2. **Post Release** - Syncs changelog to `main` (via PR) and announces the release
 
-The changelog sync ensures tools like Dependabot see all releases when reading from `main`.
+The changelog sync ensures tools like Dependabot see all releases when reading from `main`. Version bumps are not automated for stable branches.
 
 ## Requirements
 
@@ -175,10 +175,8 @@ These are standard across all AlchemyCMS gems.
 
 **post-release.yml**
 - Triggers after successful release
-- **Version bump:** Creates a PR (with `skip-changelog` label) to bump version:
-  - On `main`: bumps to next minor dev version (e.g., `1.2.0` → `1.3.0.dev`)
-  - On `*-stable`: bumps to next patch dev version (e.g., `8.0.0` → `8.0.1.dev`)
-- **Changelog sync:** For stable branch releases, creates a PR to copy the changelog entry to `main` branch
+- **Version bump (main only):** Creates a PR to bump to next minor dev version (e.g., `1.2.0` → `1.3.0.dev`)
+- **Changelog sync (stable only):** Creates a PR to copy the changelog entry to `main` branch (for Dependabot visibility)
 - **Announcements:** Posts release notifications to Slack, Mastodon, and Bluesky (if secrets are configured)
 
 All PRs created by these workflows are labeled with `skip-changelog` to exclude them from future release notes.
