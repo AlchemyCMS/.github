@@ -101,6 +101,83 @@ jobs:
           git commit -m "Start development of version ${{ steps.version.outputs.version }}"
           git push origin ${{ inputs.target_branch }}
 
+  sync-changelog-to-main:
+    if: ${{ inputs.target_branch != 'main' && contains(inputs.target_branch, '-stable') }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate token
+        id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.app_id }}
+          private-key: ${{ secrets.app_private_key }}
+
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ steps.generate-token.outputs.token }}
+          ref: ${{ inputs.target_branch }}
+          fetch-depth: 0
+
+      - name: Get released version
+        id: version
+        run: |
+          VERSION=$(git describe --tags --abbrev=0 | sed 's/^v//')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Extract changelog entry from stable branch
+        id: changelog
+        run: |
+          # Extract the changelog section for this version
+          # Matches from "## X.Y.Z" until the next "## " or end of file
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # Use awk to extract the section
+          awk -v ver="$VERSION" '
+            /^## / {
+              if (found) exit
+              if (index($0, ver)) found=1
+            }
+            found { print }
+          ' CHANGELOG.md > /tmp/changelog-entry.md
+
+          echo "Extracted changelog entry:"
+          cat /tmp/changelog-entry.md
+
+      - name: Configure git
+        run: |
+          git config user.name "alchemycms-bot"
+          git config user.email "alchemycms-bot@users.noreply.github.com"
+
+      - name: Update changelog on main
+        run: |
+          # Fetch and checkout main
+          git fetch origin main
+          git checkout main
+
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # Check if this version already exists in main's changelog
+          if grep -q "^## $VERSION" CHANGELOG.md; then
+            echo "Version $VERSION already in main changelog, skipping"
+            exit 0
+          fi
+
+          # Insert the changelog entry after the first line (# Changelog header)
+          # and any blank lines following it
+          {
+            head -n 1 CHANGELOG.md
+            echo ""
+            cat /tmp/changelog-entry.md
+            tail -n +2 CHANGELOG.md
+          } > /tmp/changelog-new.md
+          mv /tmp/changelog-new.md CHANGELOG.md
+
+          # Commit and push
+          git add CHANGELOG.md
+          git commit -m "Add $VERSION changelog entry from stable branch"
+          git push origin main
+
   announce:
     runs-on: ubuntu-latest
     env:
