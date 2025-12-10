@@ -8,7 +8,14 @@ The release process is fully automated with three workflows:
 
 1. **prepare-release.yml** - Creates a release PR with version bump and changelog
 2. **release.yml** - Publishes the gem to RubyGems and creates a GitHub release
-3. **post-release.yml** - Bumps to next development version after release
+3. **post-release.yml** - Bumps to next development version, syncs changelog, and announces release
+
+### Features
+
+- Supports both `main` and `*-stable` branch releases
+- Automatic changelog generation from GitHub release notes
+- Post-release announcements to Slack, Mastodon, and Bluesky
+- Changelog sync to `main` branch after stable releases (for Dependabot visibility)
 
 ## Adding Workflows to Your Gem
 
@@ -34,7 +41,7 @@ on:
 
 jobs:
   prepare:
-    uses: AlchemyCMS/.github/workflows/prepare-release.yml@main
+    uses: AlchemyCMS/.github/.github/workflows/prepare-release.yml@main
     with:
       version_file_path: lib/alchemy/YOUR_GEM/version.rb  # UPDATE THIS
       bump: ${{ inputs.bump }}
@@ -53,11 +60,12 @@ on:
     types: [closed]
     branches:
       - main
+      - '*-stable'
 
 jobs:
   publish:
     if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/v'))
-    uses: AlchemyCMS/.github/workflows/release.yml@main
+    uses: AlchemyCMS/.github/.github/workflows/release.yml@main
     with:
       version_file_path: lib/alchemy/YOUR_GEM/version.rb  # UPDATE THIS
     secrets:
@@ -76,14 +84,20 @@ on:
       - completed
 
 jobs:
-  bump-dev-version:
+  post-release:
     if: github.event.workflow_run.conclusion == 'success'
-    uses: AlchemyCMS/.github/workflows/post-release.yml@main
+    uses: AlchemyCMS/.github/.github/workflows/post-release.yml@main
     with:
       version_file_path: lib/alchemy/YOUR_GEM/version.rb  # UPDATE THIS
+      target_branch: ${{ github.event.workflow_run.head_branch }}
     secrets:
       app_id: ${{ vars.ALCHEMY_BOT_APP_ID }}
       app_private_key: ${{ secrets.ALCHEMY_BOT_APP_PRIVATE_KEY }}
+      slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+      mastodon_access_token: ${{ secrets.MASTODON_ACCESS_TOKEN }}
+      mastodon_instance: ${{ secrets.MASTODON_INSTANCE }}
+      bluesky_identifier: ${{ secrets.BLUESKY_IDENTIFIER }}
+      bluesky_password: ${{ secrets.BLUESKY_PASSWORD }}
 ```
 
 ### Configuration
@@ -97,27 +111,40 @@ The workflows will automatically use the organization's `ALCHEMY_BOT_APP_ID` var
 
 ## How to Release
 
-### Step 1: Prepare Release
+### Releasing from `main`
 
 1. Go to **Actions** tab in your gem repository
 2. Select **Prepare Release** workflow
-3. Click **Run workflow**
+3. Click **Run workflow** (ensure `main` branch is selected)
 4. Choose the version bump type:
    - **release** - Finalize a pre-release (e.g., `8.0.0.dev` → `8.0.0`)
    - **patch** - Increment patch version (e.g., `1.2.3` → `1.2.4`)
    - **minor** - Increment minor version (e.g., `1.2.3` → `1.3.0`)
    - **major** - Increment major version (e.g., `1.2.3` → `2.0.0`)
 
-This creates a PR with:
+This creates a PR targeting `main` with:
 - Updated version file
 - Generated changelog from GitHub release notes
 - Release branch `release/vX.Y.Z`
 
-### Step 2: Review and Merge
-
-Review the release PR and merge it to `main`. This automatically triggers:
+Review and merge the PR. This automatically triggers:
 1. **Publish Release** - Publishes gem to RubyGems and creates GitHub release
-2. **Post Release** - Bumps version to next dev version (e.g., `1.2.0` → `1.3.0.dev`)
+2. **Post Release** - Bumps version to next minor dev version (e.g., `1.2.0` → `1.3.0.dev`) and announces the release
+
+### Releasing from Stable Branches
+
+For repositories with `x.y-stable` branches (e.g., `8.0-stable`):
+
+1. Go to **Actions** tab
+2. Select **Prepare Release** workflow
+3. Click **Run workflow** and **select the stable branch** (e.g., `8.0-stable`)
+4. Choose bump type (typically `release` for stable branches)
+
+This creates a PR targeting the stable branch. After merge:
+1. **Publish Release** - Publishes gem and creates GitHub release
+2. **Post Release** - Bumps to next patch dev version (e.g., `8.0.0` → `8.0.1.dev`), syncs changelog to `main`, and announces the release
+
+The changelog sync ensures tools like Dependabot see all releases when reading from `main`.
 
 ## Requirements
 
@@ -138,29 +165,43 @@ These are standard across all AlchemyCMS gems.
 - Creates release branch `release/vX.Y.Z`
 - Generates changelog from GitHub release notes API
 - Updates version file and prepends to CHANGELOG.md
-- Creates PR to main branch
+- Creates PR targeting the branch it was triggered from (`main` or `*-stable`)
 
 **release.yml**
-- Triggers when a `release/v*` PR is merged to main
+- Triggers when a `release/v*` PR is merged to `main` or `*-stable` branches
 - Sets up Ruby and installs dependencies
 - Publishes gem to RubyGems using trusted publishing
 - Creates GitHub release with auto-generated notes
 
 **post-release.yml**
 - Triggers after successful release
-- Bumps to next minor dev version (e.g., `1.2.0` → `1.3.0.dev`)
-- Commits version change directly to main branch
+- **Version bump:**
+  - On `main`: bumps to next minor dev version (e.g., `1.2.0` → `1.3.0.dev`)
+  - On `*-stable`: bumps to next patch dev version (e.g., `8.0.0` → `8.0.1.dev`)
+- **Changelog sync:** For stable branch releases, copies the changelog entry to `main` branch
+- **Announcements:** Posts release notifications to Slack, Mastodon, and Bluesky (if secrets are configured)
+
+## Release Announcements
+
+The post-release workflow can announce releases to multiple platforms. Configure these org-level secrets:
+
+| Secret | Description |
+|--------|-------------|
+| `SLACK_WEBHOOK_URL` | Slack incoming webhook URL (via Slack App) |
+| `MASTODON_ACCESS_TOKEN` | Mastodon bot access token with `write:statuses` scope |
+| `MASTODON_INSTANCE` | Mastodon instance URL (e.g., `https://ruby.social`) |
+| `BLUESKY_IDENTIFIER` | Bluesky handle, DID, or custom domain |
+| `BLUESKY_PASSWORD` | Bluesky app password (not main password) |
+
+All announcement secrets are optional. Announcements are skipped for platforms without configured secrets.
 
 ## Advanced: Version Pinning
 
-The examples above use `@main` to always use the latest workflow version. You can also pin to specific versions:
+The examples above use `@main` to always use the latest workflow version. You can also pin to specific commits:
 
 ```yaml
-# Pin to a tag (recommended for stability)
-uses: AlchemyCMS/.github/workflows/release.yml@v1
-
 # Pin to a specific commit (maximum control)
-uses: AlchemyCMS/.github/workflows/release.yml@abc123
+uses: AlchemyCMS/.github/.github/workflows/release.yml@abc123
 ```
 
 Using `@main` ensures you automatically get updates and fixes, which is recommended for most AlchemyCMS gems.
