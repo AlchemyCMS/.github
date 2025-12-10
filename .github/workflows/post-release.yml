@@ -7,6 +7,10 @@ on:
         description: 'Path to the version file (e.g., lib/alchemy/solidus/version.rb)'
         required: true
         type: string
+      gem_name:
+        description: 'Name of the gem for announcements (defaults to repo name)'
+        required: false
+        type: string
     secrets:
       app_id:
         description: 'GitHub App ID for authentication'
@@ -14,6 +18,21 @@ on:
       app_private_key:
         description: 'GitHub App private key for authentication'
         required: true
+      slack_webhook_url:
+        description: 'Slack incoming webhook URL for release announcements'
+        required: false
+      mastodon_access_token:
+        description: 'Mastodon bot access token'
+        required: false
+      mastodon_instance:
+        description: 'Mastodon instance URL (e.g., https://ruby.social)'
+        required: false
+      bluesky_identifier:
+        description: 'Bluesky handle or DID'
+        required: false
+      bluesky_password:
+        description: 'Bluesky app password'
+        required: false
 
 jobs:
   bump-dev-version:
@@ -36,17 +55,17 @@ jobs:
         id: version
         run: |
           # Read current version
-          CURRENT=$(grep VERSION ${{ inputs.version_file_path }} | sed 's/.*"\(.*\)".*/\1/')
+          CURRENT=$(grep VERSION "${{ inputs.version_file_path }}" | sed 's/.*"\(.*\)".*/\1/')
           echo "Current version: $CURRENT"
 
           # Split into major.minor.patch
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          IFS='.' read -r MAJOR MINOR _ <<< "$CURRENT"
 
           # Bump minor version and add .dev suffix
           MINOR=$((MINOR + 1))
           NEW_VERSION="$MAJOR.$MINOR.0.dev"
           echo "New dev version: $NEW_VERSION"
-          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Configure git
         run: |
@@ -62,3 +81,65 @@ jobs:
           git add ${{ inputs.version_file_path }}
           git commit -m "Start development of version ${{ steps.version.outputs.version }}"
           git push origin main
+
+  announce:
+    runs-on: ubuntu-latest
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.slack_webhook_url }}
+      MASTODON_ACCESS_TOKEN: ${{ secrets.mastodon_access_token }}
+      MASTODON_INSTANCE: ${{ secrets.mastodon_instance }}
+      BLUESKY_IDENTIFIER: ${{ secrets.bluesky_identifier }}
+      BLUESKY_PASSWORD: ${{ secrets.bluesky_password }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get latest release version
+        id: version
+        run: |
+          VERSION=$(git describe --tags --abbrev=0 | sed 's/^v//')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Post to Slack
+        if: ${{ env.SLACK_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@v2.0.0
+        with:
+          webhook: ${{ env.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "🎉 *${{ inputs.gem_name || github.event.repository.name }} v${{ steps.version.outputs.version }}* has been released!\n\n<${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}|View release notes>"
+                  }
+                }
+              ]
+            }
+
+      - name: Post to Mastodon
+        if: ${{ env.MASTODON_ACCESS_TOKEN != '' && env.MASTODON_INSTANCE != '' }}
+        run: |
+          curl -s -X POST \
+            -H "Authorization: Bearer $MASTODON_ACCESS_TOKEN" \
+            -F "status=🎉 ${{ inputs.gem_name || github.event.repository.name }} v${{ steps.version.outputs.version }} has been released!
+
+          ${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}
+
+          #RubyGems #Ruby #Rails #CMS #AlchemyCMS" \
+            "$MASTODON_INSTANCE/api/v1/statuses"
+
+      - name: Post to Bluesky
+        if: ${{ env.BLUESKY_IDENTIFIER != '' && env.BLUESKY_PASSWORD != '' }}
+        uses: myConsciousness/bluesky-post@v5
+        with:
+          text: |
+            🎉 ${{ inputs.gem_name || github.event.repository.name }} v${{ steps.version.outputs.version }} has been released!
+          link-preview-url: ${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}
+          tags: rubygems,ruby,rails,cms,alchemycms
+          identifier: ${{ env.BLUESKY_IDENTIFIER }}
+          password: ${{ env.BLUESKY_PASSWORD }}
