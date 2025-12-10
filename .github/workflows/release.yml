@@ -47,6 +47,7 @@ jobs:
         uses: rubygems/release-gem@v1
         with:
           setup-trusted-publisher: false
+          attestations: false
         env:
           GEM_HOST_API_KEY: ${{ secrets.rubygems_api_key }}
 
