@@ -250,11 +250,13 @@ jobs:
 
       - name: Post to Bluesky
         if: ${{ env.BLUESKY_IDENTIFIER != '' && env.BLUESKY_PASSWORD != '' }}
-        uses: myConsciousness/bluesky-post@v5
+        uses: cbrgm/bluesky-github-action@v1
         with:
+          handle: ${{ env.BLUESKY_IDENTIFIER }}
+          password: ${{ env.BLUESKY_PASSWORD }}
           text: |
             🎉 ${{ inputs.gem_name || github.event.repository.name }} v${{ steps.version.outputs.version }} has been released!
-          link-preview-url: ${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}
-          tags: rubygems,ruby,rails,cms,alchemycms
-          identifier: ${{ env.BLUESKY_IDENTIFIER }}
-          password: ${{ env.BLUESKY_PASSWORD }}
+
+            ${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}
+
+            #rubygems #ruby #rails #cms #alchemycms
