@@ -7,6 +7,10 @@ on:
         description: 'Path to the version file (e.g., lib/alchemy/solidus/version.rb)'
         required: true
         type: string
+      target_branch:
+        description: 'The branch this release is being made from (e.g., main, 8.0-stable)'
+        required: true
+        type: string
     secrets:
       app_id:
         description: 'GitHub App ID for authentication'
@@ -65,3 +69,11 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
+
+      - name: Trigger post-release workflow
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+        run: |
+          gh api repos/${{ github.repository }}/dispatches \
+            -f event_type=post-release \
+            -f "client_payload[target_branch]=${{ inputs.target_branch }}"
