@@ -131,11 +131,13 @@ jobs:
       - name: Extract changelog entry from stable branch
         id: changelog
         run: |
-          # Extract the changelog section for this version
-          # Matches from "## X.Y.Z" until the next "## " or end of file
           VERSION="${{ steps.version.outputs.version }}"
 
-          # Use awk to extract the section
+          # Fetch latest from stable branch to ensure we have the merged changelog
+          git fetch origin "${{ inputs.target_branch }}"
+          git checkout "origin/${{ inputs.target_branch }}" -- CHANGELOG.md
+
+          # Extract the changelog section for this version
           awk -v ver="$VERSION" '
             /^## / {
               if (found) exit
