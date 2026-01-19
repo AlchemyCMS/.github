@@ -92,12 +92,19 @@ jobs:
             // Get the previous tag for comparison
             let previousTag;
             try {
+              const newVersion = '${{ steps.version.outputs.version }}';
+              const [major, minor] = newVersion.split('.');
+              const versionPrefix = `v${major}.${minor}.`;
+
               const tags = await github.rest.repos.listTags({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                per_page: 1
+                per_page: 100
               });
-              previousTag = tags.data[0]?.name;
+
+              previousTag = tags.data
+                .map(t => t.name)
+                .filter(name => name.startsWith(versionPrefix))[0];
             } catch (error) {
               console.log('No previous tags found');
             }
