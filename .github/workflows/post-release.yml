@@ -16,6 +16,11 @@ on:
         description: 'Name of the gem for announcements (defaults to repo name)'
         required: false
         type: string
+      announce:
+        description: 'Announce release on social media'
+        required: false
+        type: boolean
+        default: true
     secrets:
       app_id:
         description: 'GitHub App ID for authentication'
@@ -200,6 +205,7 @@ jobs:
             --label "skip-changelog"
 
   announce:
+    if: ${{ inputs.announce }}
     runs-on: ubuntu-latest
     env:
       SLACK_WEBHOOK_URL: ${{ secrets.slack_webhook_url }}
