@@ -19,8 +19,8 @@ on:
         description: 'GitHub App private key for authentication'
         required: true
       rubygems_api_key:
-        description: 'RubyGems API key for publishing'
-        required: true
+        description: 'RubyGems API key (Optional). Only used if trusted publishing is not configured for the gem (recommended).'
+        required: false
 
 jobs:
   publish:
@@ -50,8 +50,8 @@ jobs:
       - name: Release gem to RubyGems
         uses: rubygems/release-gem@v1
         with:
-          setup-trusted-publisher: false
-          attestations: false
+          setup-trusted-publisher: ${{ !secrets.rubygems_api_key }}
+          attestations: ${{ !secrets.rubygems_api_key }}
         env:
           GEM_HOST_API_KEY: ${{ secrets.rubygems_api_key }}
 
