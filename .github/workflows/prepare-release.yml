@@ -102,9 +102,16 @@ jobs:
                 per_page: 100
               });
 
-              previousTag = tags.data
-                .map(t => t.name)
-                .filter(name => name.startsWith(versionPrefix))[0];
+              const tagNames = tags.data.map(t => t.name);
+
+              // Try same minor series first (e.g., v8.1.x)
+              previousTag = tagNames.find(name => name.startsWith(versionPrefix));
+
+              // Fall back to previous minor series (e.g., v8.0.x)
+              if (!previousTag && parseInt(minor) > 0) {
+                const prevMinorPrefix = `v${major}.${parseInt(minor) - 1}.`;
+                previousTag = tagNames.find(name => name.startsWith(prevMinorPrefix));
+              }
             } catch (error) {
               console.log('No previous tags found');
             }
