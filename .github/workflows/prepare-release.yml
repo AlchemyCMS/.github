@@ -112,6 +112,12 @@ jobs:
                 const prevMinorPrefix = `v${major}.${parseInt(minor) - 1}.`;
                 previousTag = tagNames.find(name => name.startsWith(prevMinorPrefix));
               }
+
+              // Fall back to previous major version (e.g., v7.x when releasing v8.0.0)
+              if (!previousTag && parseInt(minor) === 0 && parseInt(major) > 0) {
+                const prevMajor = parseInt(major) - 1;
+                previousTag = tagNames.find(name => name.startsWith(`v${prevMajor}.`));
+              }
             } catch (error) {
               console.log('No previous tags found');
             }
