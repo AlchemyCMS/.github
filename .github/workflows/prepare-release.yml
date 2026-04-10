@@ -113,10 +113,12 @@ jobs:
                 previousTag = tagNames.find(name => name.startsWith(prevMinorPrefix));
               }
 
-              // Fall back to previous major version (e.g., v7.x when releasing v8.0.0)
-              if (!previousTag && parseInt(minor) === 0 && parseInt(major) > 0) {
-                const prevMajor = parseInt(major) - 1;
-                previousTag = tagNames.find(name => name.startsWith(`v${prevMajor}.`));
+              // Fall back to previous major version (e.g., v7.x when releasing v8.0.0,
+              // or v4.x when releasing v8.2.0 after a version jump)
+              if (!previousTag && parseInt(major) > 0) {
+                for (let m = parseInt(major) - 1; m >= 0 && !previousTag; m--) {
+                  previousTag = tagNames.find(name => name.startsWith(`v${m}.`));
+                }
               }
             } catch (error) {
               console.log('No previous tags found');
