@@ -69,11 +69,19 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Version: $VERSION"
 
+      - name: Find previous tag
+        id: previous-tag
+        uses: AlchemyCMS/.github/actions/find-previous-tag@main
+        with:
+          version: ${{ steps.version.outputs.version }}
+          github-token: ${{ steps.generate-token.outputs.token }}
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.version.outputs.version }}
           generate_release_notes: true
+          previous_tag: ${{ steps.previous-tag.outputs.tag }}
         env:
           GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
 

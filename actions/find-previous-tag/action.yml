@@ -1,0 +1,59 @@
+name: Find Previous Tag
+description: >
+  Find the previous release tag for changelog generation.
+  Walks backward through version series to handle major version jumps.
+
+inputs:
+  version:
+    description: 'The new version being released (e.g., 8.2.0)'
+    required: true
+  github-token:
+    description: 'GitHub token for API access'
+    required: true
+
+outputs:
+  tag:
+    description: 'The previous tag found (empty if none)'
+    value: ${{ steps.find.outputs.result }}
+
+runs:
+  using: composite
+  steps:
+    - name: Find previous tag
+      id: find
+      uses: actions/github-script@v9
+      with:
+        github-token: ${{ inputs.github-token }}
+        result-encoding: string
+        script: |
+          const version = '${{ inputs.version }}';
+          const [major, minor] = version.split('.');
+          const versionPrefix = `v${major}.${minor}.`;
+
+          const tags = await github.rest.repos.listTags({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            per_page: 100
+          });
+
+          const tagNames = tags.data.map(t => t.name);
+
+          // Try same minor series first (e.g., v8.2.x)
+          let previousTag = tagNames.find(name => name.startsWith(versionPrefix));
+
+          // Fall back to previous minor series (e.g., v8.1.x)
+          if (!previousTag && parseInt(minor) > 0) {
+            const prevMinorPrefix = `v${major}.${parseInt(minor) - 1}.`;
+            previousTag = tagNames.find(name => name.startsWith(prevMinorPrefix));
+          }
+
+          // Fall back to previous major version, walking backward
+          // to handle version jumps (e.g., v4.x when releasing v8.2.0)
+          if (!previousTag && parseInt(major) > 0) {
+            for (let m = parseInt(major) - 1; m >= 0 && !previousTag; m--) {
+              previousTag = tagNames.find(name => name.startsWith(`v${m}.`));
+            }
+          }
+
+          console.log(`Previous tag: ${previousTag || 'none'}`);
+          return previousTag || '';
