@@ -26,12 +26,12 @@ jobs:
     steps:
       - name: Generate token
         id: generate-token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ secrets.app_id }}
+          client-id: ${{ secrets.app_id }}
           private-key: ${{ secrets.app_private_key }}
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           token: ${{ steps.generate-token.outputs.token }}
 
@@ -83,7 +83,7 @@ jobs:
 
       - name: Generate release notes
         id: release-notes
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ steps.generate-token.outputs.token }}
           script: |

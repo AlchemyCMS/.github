@@ -52,12 +52,12 @@ jobs:
     steps:
       - name: Generate token
         id: generate-token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ secrets.app_id }}
+          client-id: ${{ secrets.app_id }}
           private-key: ${{ secrets.app_private_key }}
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           token: ${{ steps.generate-token.outputs.token }}
           ref: main
@@ -120,7 +120,7 @@ jobs:
       BLUESKY_PASSWORD: ${{ secrets.bluesky_password }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.target_branch }}
           fetch-depth: 0
@@ -133,7 +133,7 @@ jobs:
 
       - name: Post to Slack
         if: ${{ env.SLACK_WEBHOOK_URL != '' }}
-        uses: slackapi/slack-github-action@v2.0.0
+        uses: slackapi/slack-github-action@v3
         with:
           webhook: ${{ env.SLACK_WEBHOOK_URL }}
           webhook-type: incoming-webhook

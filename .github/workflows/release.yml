@@ -32,12 +32,12 @@ jobs:
     steps:
       - name: Generate token
         id: generate-token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ secrets.app_id }}
+          client-id: ${{ secrets.app_id }}
           private-key: ${{ secrets.app_private_key }}
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           token: ${{ steps.generate-token.outputs.token }}
 
@@ -63,7 +63,7 @@ jobs:
           echo "Version: $VERSION"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.version.outputs.version }}
           generate_release_notes: true
