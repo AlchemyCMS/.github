@@ -25,6 +25,13 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # alchemy_cms' Gemfile installs ruby-vips when ALCHEMY_STORAGE_ADAPTER is
+    # "active_storage" (its default), and ruby-vips needs libvips present on the
+    # runner. Forcing "none" skips that during bundle install so we don't have to
+    # install libvips just to publish the gem. This is a no-op for gems that
+    # don't read this variable.
+    env:
+      ALCHEMY_STORAGE_ADAPTER: none
     permissions:
       id-token: write
       contents: write
