@@ -21,6 +21,11 @@ on:
         required: false
         type: boolean
         default: true
+      announce_to_rubyflow:
+        description: 'Open a GitHub issue to announce minor/major releases on RubyFlow'
+        required: false
+        type: boolean
+        default: false
     secrets:
       app_id:
         description: 'GitHub App ID for authentication'
@@ -174,3 +179,73 @@ jobs:
             ${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}
 
             #rubygems #ruby #rails #cms #alchemycms
+
+  # RubyFlow has no posting API and requires a GitHub-authenticated session, so
+  # we don't post automatically. Instead, for opted-in repos we open a tracking
+  # issue containing a ready-to-paste draft for a maintainer to submit by hand.
+  announce-rubyflow:
+    if: ${{ inputs.announce && inputs.announce_to_rubyflow }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate token
+        id: generate-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.app_id }}
+          private-key: ${{ secrets.app_private_key }}
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.target_branch }}
+          fetch-depth: 0
+
+      - name: Get latest release version
+        id: version
+        run: |
+          VERSION=$(git describe --tags --abbrev=0 | sed 's/^v//')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check release is minor or major
+        id: check
+        run: |
+          # RubyFlow announcements are reserved for minor and major releases.
+          # The release flow always produces clean X.Y.Z tags, so a zero patch
+          # component means this is a minor or major release.
+          PATCH=$(echo "${{ steps.version.outputs.version }}" | cut -d. -f3)
+          if [ "$PATCH" = "0" ]; then
+            echo "eligible=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping RubyFlow draft for patch release ${{ steps.version.outputs.version }}"
+          fi
+
+      - name: Open RubyFlow draft issue
+        if: ${{ steps.check.outputs.eligible == 'true' }}
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+          GEM_NAME: ${{ inputs.gem_name || github.event.repository.name }}
+          VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "Announce v$VERSION on RubyFlow" \
+            --body "$(cat <<EOF
+          A new minor or major version has been released. Announce it on [RubyFlow](https://rubyflow.com) to reach the Ruby community.
+
+          1. Go to https://rubyflow.com/#submitform and sign in with GitHub.
+          2. Paste the title and content below (edit as you like).
+          3. Close this issue once posted.
+
+          ---
+
+          **Title**
+
+          $GEM_NAME v$VERSION released
+
+          **Content**
+
+          $GEM_NAME v$VERSION has been released! See the release notes for what's new: $RELEASE_URL
+          EOF
+          )"

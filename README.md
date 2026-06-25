@@ -15,6 +15,7 @@ The release process is fully automated with three workflows:
 - Supports both `main` and `*-stable` branch releases
 - Automatic changelog generation from GitHub release notes
 - Post-release announcements to Slack, Mastodon, and Bluesky
+- Opt-in RubyFlow announcement issues for minor and major releases
 - Changelog sync to `main` branch after stable releases (for Dependabot visibility)
 
 ## Adding Workflows to Your Gem
@@ -178,6 +179,7 @@ These are standard across all AlchemyCMS gems.
 - **Version bump (main only):** Creates a PR to bump to next minor dev version (e.g., `1.2.0` → `1.3.0.dev`)
 - **Changelog sync (stable only):** Creates a PR to copy the changelog entry to `main` branch (for Dependabot visibility)
 - **Announcements:** Posts release notifications to Slack, Mastodon, and Bluesky (if secrets are configured)
+- **RubyFlow (opt-in):** For minor and major releases, opens a tracking issue with a ready-to-paste draft for manual posting to RubyFlow (when `announce_to_rubyflow: true`)
 
 All PRs created by these workflows are labeled with `skip-changelog` to exclude them from future release notes.
 
@@ -194,6 +196,37 @@ The post-release workflow can announce releases to multiple platforms. Configure
 | `BLUESKY_PASSWORD` | Bluesky app password (not main password) |
 
 All announcement secrets are optional. Announcements are skipped for platforms without configured secrets.
+
+### RubyFlow (opt-in)
+
+[RubyFlow](https://rubyflow.com) has no posting API and requires a
+GitHub-authenticated session, so the workflow does not post there automatically.
+Instead, for **minor and major releases only** (versions ending in `.0`), it
+opens a GitHub issue in the releasing repo containing a ready-to-paste title and
+content plus the RubyFlow submit link. A maintainer pastes it into RubyFlow and
+closes the issue.
+
+This is **opt-in** and disabled by default. Enable it by passing
+`announce_to_rubyflow: true` to the reusable `post-release.yml` workflow:
+
+```yaml
+jobs:
+  post-release:
+    if: github.event.workflow_run.conclusion == 'success'
+    uses: AlchemyCMS/.github/.github/workflows/post-release.yml@main
+    with:
+      version_file_path: lib/alchemy_cms/version.rb
+      target_branch: ${{ github.event.workflow_run.head_branch }}
+      announce_to_rubyflow: true
+    secrets:
+      app_id: ${{ vars.ALCHEMY_BOT_APP_ID }}
+      app_private_key: ${{ secrets.ALCHEMY_BOT_APP_PRIVATE_KEY }}
+      # ...announcement secrets as above
+```
+
+Only `alchemy_cms` enables this; other gems leave it off so we don't flood
+RubyFlow with every gem's releases. No extra secret is needed — the issue is
+created with the existing bot app token.
 
 ## Advanced: Version Pinning
 
