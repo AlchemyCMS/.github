@@ -1,7 +1,9 @@
 name: Find Previous Tag
 description: >
-  Find the previous release tag for changelog generation.
-  Walks backward through version series to handle major version jumps.
+  Find the previous release tag for changelog generation: the highest
+  release tag (vMAJOR.MINOR.PATCH) strictly below the version being released.
+  This single rule handles minor/major version jumps, patches on old stable
+  branches, and first releases without special casing.
 
 inputs:
   version:
@@ -27,33 +29,39 @@ runs:
         result-encoding: string
         script: |
           const version = '${{ inputs.version }}';
-          const [major, minor] = version.split('.');
-          const versionPrefix = `v${major}.${minor}.`;
 
-          const tags = await github.rest.repos.listTags({
+          // Parse a clean release tag (vMAJOR.MINOR.PATCH) into numbers.
+          // Pre-release / suffixed tags (e.g. v8.0.0.rc1, v1.0.0.beta) return
+          // null so changelogs are generated against the previous *stable*
+          // release, never a pre-release of the same version.
+          const parse = (name) => {
+            const m = /^v(\d+)\.(\d+)\.(\d+)$/.exec(name);
+            return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+          };
+          const compare = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+
+          const target = parse(`v${version}`);
+          if (!target) {
+            throw new Error(`Invalid version '${version}', expected MAJOR.MINOR.PATCH`);
+          }
+
+          // Fetch every tag (repos can have hundreds, so paginate), then pick
+          // the highest release tag strictly below the version being released.
+          // Sorting by semver — not relying on API order or string prefixes —
+          // is what makes minor/major jumps and patches on old stable branches
+          // all resolve correctly.
+          const tags = await github.paginate(github.rest.repos.listTags, {
             owner: context.repo.owner,
             repo: context.repo.repo,
             per_page: 100
           });
 
-          const tagNames = tags.data.map(t => t.name);
+          const previous = tags
+            .map(t => ({ name: t.name, version: parse(t.name) }))
+            .filter(t => t.version && compare(t.version, target) < 0)
+            .sort((a, b) => compare(b.version, a.version))[0];
 
-          // Try same minor series first (e.g., v8.2.x)
-          let previousTag = tagNames.find(name => name.startsWith(versionPrefix));
-
-          // Fall back to previous minor series (e.g., v8.1.x)
-          if (!previousTag && parseInt(minor) > 0) {
-            const prevMinorPrefix = `v${major}.${parseInt(minor) - 1}.`;
-            previousTag = tagNames.find(name => name.startsWith(prevMinorPrefix));
-          }
-
-          // Fall back to previous major version, walking backward
-          // to handle version jumps (e.g., v4.x when releasing v8.2.0)
-          if (!previousTag && parseInt(major) > 0) {
-            for (let m = parseInt(major) - 1; m >= 0 && !previousTag; m--) {
-              previousTag = tagNames.find(name => name.startsWith(`v${m}.`));
-            }
-          }
-
+          const previousTag = previous ? previous.name : '';
+          console.log(`New version: ${version}`);
           console.log(`Previous tag: ${previousTag || 'none'}`);
-          return previousTag || '';
+          return previousTag;
