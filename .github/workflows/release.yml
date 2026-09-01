@@ -55,12 +55,7 @@ jobs:
           ruby-version: ruby
 
       - name: Release gem to RubyGems
-        uses: rubygems/release-gem@v1
-        with:
-          setup-trusted-publisher: ${{ !secrets.rubygems_api_key }}
-          attestations: ${{ !secrets.rubygems_api_key }}
-        env:
-          GEM_HOST_API_KEY: ${{ secrets.rubygems_api_key }}
+        uses: rubygems/release-gem@7f9650160c1a4e7989fdc9855807bdbd421d8b6b # v1.4.1
 
       - name: Get version
         id: version
