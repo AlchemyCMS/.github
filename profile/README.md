@@ -16,25 +16,13 @@ https://github.com/AlchemyCMS/alchemy_cms
 
 A Devise based user authentication
 
-https://github.com/AlchemyCMS/alchemy-devise
-
-## S3 Assets
-
-Store Alchemy assets in S3 with this little gem
-
-https://github.com/AlchemyCMS/alchemy-dragonfly-s3
+https://github.com/AlchemyCMS/alchemy_cms/tree/main/devise
 
 ## JSON API
 
 Use Alchemy as a headless cms for your frontend application
 
 https://github.com/AlchemyCMS/alchemy-json_api
-
-## VueJS
-
-Helper functions to make it easier to integrate Alchemy into a Vue/Nuxt frontend app.
-
-https://github.com/AlchemyCMS/alchemy-vue
 
 ## Resources.
 
